@@ -37,6 +37,9 @@ class RingSessionManager: NSObject {
     private static let deviceHardwareUUID = "00002A27-0000-1000-8000-00805F9B34FB"
     private static let deviceFirmwareUUID = "00002A26-0000-1000-8000-00805F9B34FB"
     
+    // Realtime
+    private static let CMD_START_REAL_TIME: UInt8 = 105
+    private static let CMD_STOP_REAL_TIME: UInt8 = 106
     
     // Battery
     private static let CMD_BATTERY: UInt8 = 3
@@ -239,20 +242,16 @@ extension RingSessionManager: CBPeripheralDelegate {
         switch packet[0] {
         case RingSessionManager.CMD_BATTERY:
             handleBatteryResponse(packet: packet)
-//        case RingSessionManager.CMD_READ_HEART_RATE:
-//            handleHeartRateLogResponse(packet: packet)
-//        case Counter.shared.CMD_X:
-//            print("🔥")
-//        case RingSessionManager.CMD_START_REAL_TIME:
-//            let readingType = RealTimeReading(rawValue: packet[1]) ?? .heartRate
-//            let errorCode = packet[2]
-//            
-//            if errorCode == 0 {
-//                let readingValue = packet[3]
-//                print("Real-Time Reading - Type: \(readingType), Value: \(readingValue)")
-//            } else {
-//                print("Error in reading - Type: \(readingType), Error Code: \(errorCode)")
-//            }
+        case RingSessionManager.CMD_START_REAL_TIME:
+            let readingType = RealTimeReading(rawValue: packet[1]) ?? .heartRate
+            let errorCode = packet[2]
+            
+            if errorCode == 0 {
+                let readingValue = packet[3]
+                print("Real-Time Reading - Type: \(readingType), Value: \(readingValue)")
+            } else {
+                print("Error in reading - Type: \(readingType), Error Code: \(errorCode)")
+            }
         default:
             break
         }
@@ -272,6 +271,44 @@ extension RingSessionManager: CBPeripheralDelegate {
         }
     }
 }
+
+// MARK: - RealTime Streaming
+extension RingSessionManager {
+    func startRealTimeStreaming(type: RealTimeReading) {
+        sendRealTimeCommand(command: RingSessionManager.CMD_START_REAL_TIME, type: type, action: .start)
+    }
+    
+    func continueRealTimeStreaming(type: RealTimeReading) {
+        sendRealTimeCommand(command: RingSessionManager.CMD_START_REAL_TIME, type: type, action: .continue)
+    }
+    
+    func stopRealTimeStreaming(type: RealTimeReading) {
+        sendRealTimeCommand(command: RingSessionManager.CMD_STOP_REAL_TIME, type: type, action: nil)
+    }
+    
+    private func sendRealTimeCommand(command: UInt8, type: RealTimeReading, action: Action?) {
+        guard let uartRxCharacteristic, let peripheral else {
+            print("Cannot send real-time command. Peripheral or characteristic not ready.")
+            return
+        }
+        
+        var packetData: [UInt8] = [type.rawValue]
+        if let action = action {
+            packetData.append(action.rawValue)
+        } else {
+            packetData.append(contentsOf: [0, 0])
+        }
+        
+        do {
+            let packet = try makePacket(command: command, subData: packetData)
+            let data = Data(packet)
+            peripheral.writeValue(data, for: uartRxCharacteristic, type: .withResponse)
+        } catch {
+            print("Failed to create packet: \(error)")
+        }
+    }
+}
+
 
 // MARK: - Battery Status
 extension RingSessionManager {

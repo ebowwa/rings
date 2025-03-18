@@ -112,7 +112,6 @@ struct ContentView: View {
                     .font(Font.headline.weight(.semibold))
                 HStack(spacing: 5) {
                     if let batteryInfo {
-                        
                         BatteryView(isCharging: batteryInfo.charging, batteryLevel: batteryInfo.batteryLevel)
                         Text(batteryInfo.batteryLevel, format: .percent)
                             .font(.footnote)
@@ -129,6 +128,7 @@ struct ContentView: View {
         switch path {
         case .heartRate:
             HeartRateView()
+                .environment(ringSessionManager)
         case .spo2:
             SPO2View()
         }
